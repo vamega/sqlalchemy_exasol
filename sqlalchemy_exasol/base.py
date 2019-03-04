@@ -570,8 +570,11 @@ class EXADialect(default.DefaultDialect):
                 elif coltype == 'DECIMAL':
                     # this Dialect forces INTTYPESINRESULTSIFPOSSIBLE=y on ODBC level
                     # thus, we need to convert DECIMAL(<=18,0) back to INTEGER type
+                    # and DECIMAL(36,0) back to BIGINT type
                     if scale == 0 and precision <= 18:
                         coltype = sqltypes.INTEGER()
+                    elif scale ==0 and precision == 36:
+                        coltype = sqltypes.BIGINT()
                     else:
                         coltype = sqltypes.DECIMAL(precision, scale)
                 else:
