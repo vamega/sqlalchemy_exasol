@@ -181,9 +181,6 @@ class EXACompiler(compiler.SQLCompiler):
         if select._limit is not None:
             text += "\n LIMIT %d" % int(select._limit)
         if select._offset is not None:
-            #if self.root_connection.dialect.server_version_info < (5, 0, 0):
-            #    util.warn("EXASolution does not support OFFSET")
-            #else:
             text += "\n OFFSET %d" % int(select._offset)
 
         return text
@@ -676,8 +673,5 @@ class EXADialect(default.DefaultDialect):
 
     @reflection.cache
     def get_indexes(self, connection, table_name, schema=None, **kw):
-        schema = schema or connection.engine.url.database
-        # EXASolution has no indexes
-        # TODO: check if indexes are used by SQLA for optimizing SQL Statements.
-        # If so, we should return all columns as being indexed
+        # EXASolution has no explicit indexes
         return []
