@@ -4,8 +4,6 @@ from sqlalchemy import types as sqltypes, util
 
 from sqlalchemy_exasol.base import EXADialect
 
-from distutils.version import LooseVersion
-
 
 DEFAULT_CONNECTION_PARAMS = {
     # always enable efficient conversion to Python types: 
@@ -83,30 +81,21 @@ class EXADialect_turbodbc(EXADialect):
 
         return [[options.pop("dsn", None)], options]
 
-    def get_driver_version(self, connection):
-        # LooseVersion will also work with interim versions like 
-        # '4.2.7dev1' or '5.0.rc4'
-        if self.driver_version is None:
-            self.driver_version = LooseVersion(connection.connection.getinfo(
-                    self.dbapi.SQL_DRIVER_VER) or '2.0.0')
-        return self.driver_version
-
     def _get_server_version_info(self, connection):
         if self.server_version_info is None:
-            # check if current version of EXAODBC returns proper server version
-            if self.get_driver_version(connection) >= LooseVersion('4.2.1'):
-                # v4.2.1 and above should deliver usable SQL_DBMS_VER
-                result = connection.connection.getinfo(
-                            self.dbapi.SQL_DBMS_VER).split('.')
-            else:
-                # Older versions do not include patchlevels, 
-                # so we need to get info through SQL call
-                query = "select PARAM_VALUE from SYS.EXA_METADATA where PARAM_NAME = 'databaseProductVersion'"
-                result = connection.execute(query).fetchone()[0].split('.')
-
-            # last version position can something like: '12-S' for an EXASolo
-            self.server_version_info = (int(result[0]), int(result[1]), 
-                                        int(result[2].split('-')[0]))
+            query = "select PARAM_VALUE from SYS.EXA_METADATA where PARAM_NAME = 'databaseProductVersion'"
+            result = connection.execute(query).fetchone()[0].split('.')
+            major, minor, patch = 0, 0, 0
+            major = int(result[0])
+            minor = int(result[1])
+            try:
+                # last version position can something like: '12-S' or 'RC2'
+                # might fail with ValueError
+                patch = int(result[2].split('-')[0])
+            except ValueError:
+                # ignore if there is some funky string in the patch field
+                pass
+            self.server_version_info = (major, minor, patch)
 
         # return cached info
         return self.server_version_info
