@@ -26,7 +26,7 @@ will yield::
 Note that the ``start`` value for sequences is optional and will default to 1.
 The start value of a sequence cannot be retrieved when reflecting a Table
 object.
-The autoincrement flag for Column Objects is not supporte by exadialect.
+The autoincrement flag for Column Objects is not supported by exadialect.
 
 Identifier Casing
 -----------------
@@ -266,6 +266,16 @@ class EXADDLCompiler(compiler.DDLCompiler):
 
 
 class EXATypeCompiler(compiler.GenericTypeCompiler):
+
+    ''' force mapping of BIGINT to DECIMAL(19)
+    The mapping back is done by the driver using flag 
+    INTTYPESINRESULTSIFPOSSIBLE=Y. This is enforced by default by this
+    dialect. However, BIGINT is mapped to DECIMAL(36) and the driver only
+    converts types decimal scale==0 and 9<precision<=19 back to BIGINT 
+    https://www.exasol.com/support/browse/EXA-23267
+    '''
+    def visit_big_integer(self, type_, **kw):
+        return "DECIMAL(19)"
 
     def visit_large_binary(self, type_):
         return self.visit_BLOB(type_)
