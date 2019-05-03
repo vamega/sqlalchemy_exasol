@@ -80,14 +80,27 @@ class EXADialect_turbodbc(EXADialect):
 
         return [[options.pop("dsn", None)], options]
 
+    def get_driver_version(self, connection):
+        # LooseVersion will also work with interim versions like '4.2.7dev1' or '5.0.rc4'
+        if self.driver_version is None:
+            self.driver_version = LooseVersion( connection.connection.getinfo( self.dbapi.SQL_DRIVER_VER ) or '2.0.0' )
+        return self.driver_version
+
     def _get_server_version_info(self, connection):
         if self.server_version_info is None:
-            query = "select PARAM_VALUE from SYS.EXA_METADATA where PARAM_NAME = 'databaseProductVersion'"
-            result = connection.execute(query).fetchone()[0].split('.')
+            # need to check if current version of EXAODBC returns proper server version
+            if self.get_driver_version(connection) >= LooseVersion('4.2.1'):
+                # v4.2.1 and above should deliver usable SQL_DBMS_VER
+                result = connection.connection.getinfo( self.dbapi.SQL_DBMS_VER ).split('.')
+            else:
+                # Older versions do not include patchlevels, so we need to get info through SQL call
+                query = "select PARAM_VALUE from SYS.EXA_METADATA where PARAM_NAME = 'databaseProductVersion'"
+                result = connection.execute(query).fetchone()[0].split('.')
 
-            # last version position can something like: '12-S'
+            # last version position can something like: '12-S' for an EXASolo
             self.server_version_info = (int(result[0]), int(result[1]), int(result[2].split('-')[0]))
 
+        # return cached info
         return self.server_version_info
 
     @staticmethod
