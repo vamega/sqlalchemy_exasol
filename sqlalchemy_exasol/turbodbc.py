@@ -135,6 +135,8 @@ class EXADialect_turbodbc(EXADialect):
 
     @staticmethod
     def _interpret_destination(options):
+        if 'exahost' in options:
+            return
         if ('port' in options) or ('database' in options):
             options['exahost'] = "{}:{}".format(options.pop('destination'),
                                                 options.pop('port'))
