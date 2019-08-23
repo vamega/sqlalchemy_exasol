@@ -3,7 +3,14 @@ import decimal
 from sqlalchemy import types as sqltypes, util
 from sqlalchemy.engine.result import ResultProxy
 
-from sqlalchemy_exasol.base import EXADialect, EXAExecutionContext
+from sqlalchemy_exasol.base import EXADialect, EXAExecutionContext, EXACompiler
+
+try:
+    import pandas as pd
+
+    _PANDAS_INSTALLED = True
+except ImportError:
+    _PANDAS_INSTALLED = False
 
 
 DEFAULT_CONNECTION_PARAMS = {
@@ -60,6 +67,16 @@ class _ExaInteger(sqltypes.INTEGER):
                 return value
 
         return to_integer
+
+
+class EXATurbodbcCompiler(EXACompiler):
+    def construct_params(self, params=None, _group_number=None, _check=True):
+        if _PANDAS_INSTALLED and isinstance(params, pd.DataFrame):
+            return {0: params}
+        else:
+            return super(EXATurbodbcCompiler, self).construct_params(
+                params, _group_number, _check
+            )
 
 
 class TurbodbcResultProxy(ResultProxy):
@@ -150,6 +167,7 @@ class EXADialect_turbodbc(EXADialect):
     supports_native_decimal = False
     supports_sane_multi_rowcount = False
     execution_ctx_cls = EXATurbodbcExecutionContext
+    statement_compiler = EXATurbodbcCompiler
 
     colspecs = {sqltypes.Numeric: _ExaDecimal, sqltypes.Integer: _ExaInteger}
 
@@ -229,6 +247,13 @@ class EXADialect_turbodbc(EXADialect):
         for key in options:
             if options[key] == 'None':
                 options[key] = None
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+        if _PANDAS_INSTALLED and isinstance(parameters, pd.DataFrame):
+            cursor.executemanycolumns(statement, parameters)
+            raise Exception("Discovered pandas df")
+        else:
+            super(EXADialect_turbodbc, self).do_execute(cursor, statement, parameters)
 
 
 dialect = EXADialect_turbodbc
