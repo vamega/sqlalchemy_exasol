@@ -1,12 +1,13 @@
 import decimal
 
 from sqlalchemy import types as sqltypes, util
+from sqlalchemy.engine.result import ResultProxy
 
-from sqlalchemy_exasol.base import EXADialect
+from sqlalchemy_exasol.base import EXADialect, EXAExecutionContext
 
 
 DEFAULT_CONNECTION_PARAMS = {
-    # always enable efficient conversion to Python types: 
+    # always enable efficient conversion to Python types:
     # see https://www.exasol.com/support/browse/EXASOL-898
     'inttypesinresultsifpossible': 'y',
 }
@@ -61,12 +62,94 @@ class _ExaInteger(sqltypes.INTEGER):
         return to_integer
 
 
+class TurbodbcResultProxy(ResultProxy):
+    def fetchallarrow(self, *args, **kwargs):
+        """
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        try:
+            result_table = self.cursor.fetchallarrow(*args, **kwargs)
+            self._soft_close()
+            return result_table
+        except AttributeError:
+            return self._non_result(None)
+
+    def fetchallpandas(self, columns_to_lowercase=True, *args, **kwargs):
+        """
+
+        :type columns_to_lowercase: bool
+        :param columns_to_lowercase: If true, then the column names in the resulting
+            dataset will be changed to lowercase.
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        try:
+            result_table = self.cursor.fetchallarrow(*args, **kwargs)
+            result_df = result_table.to_pandas()
+
+            if columns_to_lowercase:
+                result_df.columns = [x.lower() for x in result_df.columns]
+
+            return result_df
+        except AttributeError:
+            return self._non_result(None)
+
+    def fetcharrowbatches(self, *args, **kwargs):
+        """
+        Returns an iterator of pyarrow tables.
+        If the query resulted in no rows an empty pyarrow table will be yielded by the
+        generator.
+
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        result_table_batches = self.cursor.fetcharrowbatches(*args, **kwargs)
+        for result_table in result_table_batches:
+            yield result_table
+        self._soft_close()
+
+    def fetchpandasbatches(self, columns_to_lowercase=True, *args, **kwargs):
+        """
+        Returns an iterator of pyarrow tables.
+        If the query resulted in no rows an empty pyarrow table will be yielded by the
+        generator.
+
+        :param columns_to_lowercase: If true, then the column names in the resulting
+            dataset will be changed to lowercase.
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        result_table_batches = self.cursor.fetcharrowbatches(*args, **kwargs)
+        for result_table in result_table_batches:
+            result_df = result_table.to_pandas()
+
+            if columns_to_lowercase:
+                result_df.columns = [x.lower() for x in result_df.columns]
+
+            yield result_df
+        self._soft_close()
+
+
+class EXATurbodbcExecutionContext(EXAExecutionContext):
+    execute_columns = True
+
+    def get_result_proxy(self):
+        return TurbodbcResultProxy(self)
+
+
 class EXADialect_turbodbc(EXADialect):
     driver = 'turbodbc'
     driver_version = None
     server_version_info = None
     supports_native_decimal = False
     supports_sane_multi_rowcount = False
+    execution_ctx_cls = EXATurbodbcExecutionContext
 
     colspecs = {sqltypes.Numeric: _ExaDecimal, sqltypes.Integer: _ExaInteger}
 
