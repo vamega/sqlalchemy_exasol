@@ -12,19 +12,18 @@ jobs:
         python-version: [2.7, 3.5, 3.6, 3.7]
         odbc-library: [pyodbc, turbodbc]
 
-    # docker run --name exasoldb -p 127.0.0.1:8899:8888 --detach --privileged --stop-timeout 120  exasol/docker-db:<version>
+    # docker run --name exasoldb -p 127.0.0.1:8899:8888 --detach --privileged   exasol/docker-db:<version>
     services:
       exasol:
         image: exasol/docker-db:latest
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
         ports:
-          # will assign a random free host port
-          - 5432/tcp
-        # needed because the postgres container does not provide a healthcheck
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+          - 8888:8888
+        options: >
+          --health-cmd 'dwad_client uptime DB1 | grep running'
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --stop-timeout 120
 
     steps:
     - uses: actions/checkout@v1
@@ -32,18 +31,26 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
+    - name: Install system dependencies
+      run: >
+        sudo DEBIAN_FRONTEND=noninteractive apt install
+          unixodbc
+          unixodbc-dev
+          libboost-date-time-dev
+          libboost-locale-dev
+          libboost-system-dev
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: |
-        pip install pytest
-        pytest
+#    - name: Lint with flake8
+#      run: |
+#        pip install flake8
+#        # stop the build if there are Python syntax errors or undefined names
+#        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+#        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+#        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+#    - name: Test with pytest
+#      run: |
+#        pip install pytest
+#        pytest
