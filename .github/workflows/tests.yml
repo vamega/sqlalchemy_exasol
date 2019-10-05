@@ -19,6 +19,7 @@ jobs:
         ports:
           - 8888:8888
         options: >-
+          --privileged
           --health-cmd "dwad_client uptime DB1 | grep running"
           --health-interval 10s
           --health-timeout 5s
