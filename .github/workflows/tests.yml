@@ -18,7 +18,7 @@ jobs:
         image: exasol/docker-db:latest
         ports:
           - 8888:8888
-        options: >
+        options: >-
           --health-cmd "dwad_client uptime DB1 | grep running"
           --health-interval 10s
           --health-timeout 5s
@@ -32,7 +32,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install system dependencies
-      run: >
+      run: >-
         sudo DEBIAN_FRONTEND=noninteractive apt install
           unixodbc
           unixodbc-dev
